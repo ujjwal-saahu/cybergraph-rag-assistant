@@ -235,6 +235,6 @@ This project demonstrates practical AI engineering skills:
 <div align="center">
 ⭐ If you find this project useful, consider starring the repository.
 
-CyberGraph RAG — Agentic AI for trusted technical knowledge retrieval
+CyberGraph RAG - Agentic AI for trusted technical knowledge retrieval
 
-</div> ```
+</div> 
