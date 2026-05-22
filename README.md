@@ -88,7 +88,7 @@ Final Answer with Sources
 
 ```
 
-
+```markdown
 ## 🏗️ System Architecture
 
 CyberGraph RAG
@@ -120,6 +120,7 @@ CyberGraph RAG
 │
 └── Frontend
     └── Streamlit Web Interface
+```
 
  ## 🛠️ Tech Stack
 
@@ -136,6 +137,8 @@ CyberGraph RAG
 | API Docs         | Swagger UI                        |
 | Environment      | Conda / venv                      |
 
+
+```markdown
 ## 📂 Project Structure
 
 cybergraph-rag-assistant/
@@ -185,6 +188,8 @@ cybergraph-rag-assistant/
 ├── .env.example
 ├── .gitignore
 └── README.md
+
+```
 
 ## 🎯 Use Cases
 
