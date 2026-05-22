@@ -8,12 +8,14 @@ from app.config import settings
 from app.utils.file_loader import load_document, validate_file_extension
 from app.utils.chunker import DocumentChunker
 from app.services.parent_store_service import ParentStoreService
+from app.services.vector_store_service import VectorStoreService
 
 
 class DocumentService:
     """
     Service for handling document upload, saving,
-    Markdown conversion, and parent-child chunking.
+    Markdown conversion, parent-child chunking,
+    and vector database storage.
     """
 
     def __init__(self):
@@ -25,6 +27,7 @@ class DocumentService:
 
         self.chunker = DocumentChunker()
         self.parent_store = ParentStoreService()
+        self.vector_store = VectorStoreService()
 
     def save_uploaded_file(self, file: UploadFile) -> Path:
         """
@@ -64,23 +67,27 @@ class DocumentService:
 
     def process_chunks(self, markdown_path: Path) -> dict:
         """
-        Create parent-child chunks and store parent chunks.
+        Create parent-child chunks, store parent chunks,
+        and save child chunks into Qdrant vector database.
         """
 
         parent_chunks, child_chunks = self.chunker.chunk_markdown_file(markdown_path)
 
         saved_parent_count = self.parent_store.save_parent_chunks(parent_chunks)
+        saved_child_count = self.vector_store.add_child_chunks(child_chunks)
 
         return {
             "parent_chunks": len(parent_chunks),
             "child_chunks": len(child_chunks),
             "saved_parent_chunks": saved_parent_count,
+            "saved_child_chunks_to_qdrant": saved_child_count,
         }
 
     def upload_and_process(self, file: UploadFile) -> dict:
         """
         Save uploaded file, convert it to Markdown,
-        create parent-child chunks, and store parent chunks.
+        create parent-child chunks, store parent chunks,
+        and store child chunks in Qdrant.
         """
 
         saved_path = self.save_uploaded_file(file)
@@ -97,7 +104,7 @@ class DocumentService:
             "characters": len(markdown_text),
             "preview": markdown_text[:800],
             "chunking": chunk_result,
-            "status": "processed",
+            "status": "processed_and_indexed",
         }
 
     def list_documents(self) -> list[dict]:
@@ -127,3 +134,30 @@ class DocumentService:
         """
 
         return self.parent_store.list_parent_chunks()
+
+    def search_documents(self, query: str, top_k: int | None = None) -> list[dict]:
+        """
+        Search indexed child chunks from Qdrant.
+        """
+
+        results = self.vector_store.search(query=query, top_k=top_k)
+
+        formatted_results = []
+
+        for doc in results:
+            formatted_results.append(
+                {
+                    "content": doc.page_content,
+                    "metadata": doc.metadata,
+                    "characters": len(doc.page_content),
+                }
+            )
+
+        return formatted_results
+
+    def vector_db_info(self) -> dict:
+        """
+        Return Qdrant collection information.
+        """
+
+        return self.vector_store.collection_info()

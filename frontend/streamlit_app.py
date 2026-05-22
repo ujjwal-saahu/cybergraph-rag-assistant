@@ -1,0 +1,263 @@
+import requests
+import streamlit as st
+
+
+BACKEND_URL = "http://127.0.0.1:8000"
+
+
+st.set_page_config(
+    page_title="CyberGraph RAG",
+    page_icon="🛡️",
+    layout="wide",
+)
+
+
+st.title("🛡️ CyberGraph RAG")
+st.caption(
+    "Agentic Cybersecurity Knowledge Assistant powered by FastAPI, Qdrant, LangChain, Ollama, and agentic RAG checks."
+)
+
+
+with st.sidebar:
+    st.header("System Status")
+
+    if st.button("Check Backend Health"):
+        try:
+            response = requests.get(f"{BACKEND_URL}/health", timeout=20)
+            if response.status_code == 200:
+                st.success("Backend is running")
+                st.json(response.json())
+            else:
+                st.error("Backend health check failed")
+        except Exception as e:
+            st.error(f"Could not connect to backend: {e}")
+
+    st.divider()
+
+    st.header("Vector DB")
+
+    if st.button("Check Vector DB"):
+        try:
+            response = requests.get(f"{BACKEND_URL}/documents/vector-db/info", timeout=20)
+            if response.status_code == 200:
+                st.json(response.json())
+            else:
+                st.error("Could not fetch vector DB info")
+        except Exception as e:
+            st.error(f"Error: {e}")
+
+
+tab_upload, tab_chat, tab_documents = st.tabs(
+    ["📄 Upload Documents", "💬 Ask Questions", "📚 Documents"]
+)
+
+
+with tab_upload:
+    st.subheader("Upload PDF / TXT / Markdown")
+
+    uploaded_file = st.file_uploader(
+        "Choose a document",
+        type=["pdf", "txt", "md", "markdown"],
+    )
+
+    if uploaded_file is not None:
+        st.info(f"Selected file: {uploaded_file.name}")
+
+        if st.button("Upload and Index Document"):
+            with st.spinner("Uploading, chunking, embedding, and indexing document..."):
+                try:
+                    files = {
+                        "file": (
+                            uploaded_file.name,
+                            uploaded_file.getvalue(),
+                            uploaded_file.type,
+                        )
+                    }
+
+                    response = requests.post(
+                        f"{BACKEND_URL}/documents/upload",
+                        files=files,
+                        timeout=300,
+                    )
+
+                    if response.status_code == 200:
+                        result = response.json()
+                        st.success("Document processed and indexed successfully")
+
+                        col1, col2, col3 = st.columns(3)
+
+                        chunking = result.get("chunking", {})
+
+                        col1.metric(
+                            "Parent Chunks",
+                            chunking.get("parent_chunks", 0),
+                        )
+                        col2.metric(
+                            "Child Chunks",
+                            chunking.get("child_chunks", 0),
+                        )
+                        col3.metric(
+                            "Indexed Chunks",
+                            chunking.get("saved_child_chunks_to_qdrant", 0),
+                        )
+
+                        with st.expander("Document Preview"):
+                            st.write(result.get("preview", ""))
+
+                        with st.expander("Full Upload Response"):
+                            st.json(result)
+
+                    else:
+                        st.error("Upload failed")
+                        st.write(response.text)
+
+                except Exception as e:
+                    st.error(f"Upload error: {e}")
+
+
+with tab_chat:
+    st.subheader("Ask a Question from Uploaded Documents")
+
+    question = st.text_area(
+        "Your question",
+        placeholder="Example: What is his cybersecurity experience?",
+        height=100,
+    )
+
+    top_k = st.slider(
+        "Top-K child chunks for retrieval",
+        min_value=1,
+        max_value=10,
+        value=3,
+    )
+
+    if st.button("Ask CyberGraph RAG"):
+        if not question.strip():
+            st.warning("Please enter a question first.")
+        else:
+            with st.spinner("Running agentic RAG pipeline..."):
+                try:
+                    payload = {
+                        "question": question,
+                        "top_k": top_k,
+                    }
+
+                    response = requests.post(
+                        f"{BACKEND_URL}/chat/",
+                        json=payload,
+                        timeout=600,
+                    )
+
+                    if response.status_code == 200:
+                        result = response.json()
+
+                        st.success("Answer generated")
+
+                        st.markdown("## Answer")
+                        st.write(result.get("answer", ""))
+
+                        st.divider()
+
+                        col1, col2, col3 = st.columns(3)
+
+                        col1.metric(
+                            "Parent Contexts",
+                            result.get("parent_context_count", 0),
+                        )
+                        col2.metric(
+                            "Relevant Contexts",
+                            result.get("relevant_context_count", 0),
+                        )
+                        col3.metric(
+                            "Answer Regenerated",
+                            str(result.get("answer_regenerated", False)),
+                        )
+
+                        with st.expander("Rewritten Query"):
+                            st.write(result.get("rewritten_query", ""))
+
+                        with st.expander("Sources"):
+                            sources = result.get("sources", [])
+                            if sources:
+                                st.json(sources)
+                            else:
+                                st.info("No sources returned.")
+
+                        with st.expander("Relevance Grades"):
+                            grades = result.get("relevance_grades", [])
+                            if grades:
+                                st.json(grades)
+                            else:
+                                st.info("No relevance grades returned.")
+
+                        with st.expander("Hallucination Check"):
+                            hallucination_check = result.get("hallucination_check", {})
+                            st.json(hallucination_check)
+
+                        with st.expander("Full Response JSON"):
+                            st.json(result)
+
+                    else:
+                        st.error("Chat request failed")
+                        st.write(response.text)
+
+                except Exception as e:
+                    st.error(f"Chat error: {e}")
+
+
+with tab_documents:
+    st.subheader("Processed Documents")
+
+    if st.button("Refresh Documents"):
+        try:
+            response = requests.get(f"{BACKEND_URL}/documents/", timeout=60)
+
+            if response.status_code == 200:
+                result = response.json()
+                documents = result.get("documents", [])
+
+                if not documents:
+                    st.info("No processed documents found.")
+                else:
+                    for doc in documents:
+                        with st.expander(doc.get("filename", "Unknown document")):
+                            st.write(f"Path: `{doc.get('path')}`")
+                            st.write(f"Characters: {doc.get('characters')}")
+                            st.write(doc.get("preview", ""))
+
+            else:
+                st.error("Could not fetch documents")
+
+        except Exception as e:
+            st.error(f"Error: {e}")
+
+    st.divider()
+
+    st.subheader("Parent Chunks")
+
+    if st.button("Refresh Parent Chunks"):
+        try:
+            response = requests.get(f"{BACKEND_URL}/documents/parent-chunks", timeout=60)
+
+            if response.status_code == 200:
+                result = response.json()
+                parent_chunks = result.get("parent_chunks", [])
+
+                if not parent_chunks:
+                    st.info("No parent chunks found.")
+                else:
+                    st.write(f"Total parent chunks: {len(parent_chunks)}")
+
+                    for chunk in parent_chunks[:20]:
+                        with st.expander(
+                            f"{chunk.get('source')} | Parent ID: {chunk.get('parent_id')}"
+                        ):
+                            st.write(f"Document ID: `{chunk.get('document_id')}`")
+                            st.write(f"Characters: {chunk.get('characters')}")
+                            st.write(chunk.get("preview", ""))
+
+            else:
+                st.error("Could not fetch parent chunks")
+
+        except Exception as e:
+            st.error(f"Error: {e}")
