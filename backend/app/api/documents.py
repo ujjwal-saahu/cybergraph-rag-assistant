@@ -5,13 +5,8 @@ from app.services.retrieval_service import RetrievalService
 
 router = APIRouter(prefix="/documents", tags=["Documents"])
 
-
-def get_document_service() -> DocumentService:
-    return DocumentService()
-
-
-def get_retrieval_service() -> RetrievalService:
-    return RetrievalService()
+document_service = DocumentService()
+retrieval_service = RetrievalService()
 
 
 @router.post("/upload")
@@ -22,7 +17,6 @@ def upload_document(file: UploadFile = File(...)):
     """
 
     try:
-        document_service = get_document_service()
         result = document_service.upload_and_process(file)
         return result
 
@@ -42,11 +36,43 @@ def list_documents():
     List processed documents.
     """
 
-    document_service = get_document_service()
-
     return {
         "documents": document_service.list_documents()
     }
+
+
+@router.delete("/{document_id}")
+def delete_document(document_id: str):
+    """
+    Delete a document by document_id and rebuild the vector index.
+    """
+
+    try:
+        result = document_service.delete_document(document_id=document_id)
+        return result
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Document deletion failed: {str(e)}",
+        )
+
+
+@router.post("/reindex")
+def reindex_all_documents():
+    """
+    Rebuild the full vector index from remaining Markdown documents.
+    """
+
+    try:
+        result = document_service.reindex_all_documents()
+        return result
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Re-indexing failed: {str(e)}",
+        )
 
 
 @router.get("/parent-chunks")
@@ -54,8 +80,6 @@ def list_parent_chunks():
     """
     List stored parent chunks.
     """
-
-    document_service = get_document_service()
 
     return {
         "parent_chunks": document_service.list_parent_chunks()
@@ -72,7 +96,6 @@ def search_documents(
     """
 
     try:
-        document_service = get_document_service()
         results = document_service.search_documents(query=query, top_k=top_k)
 
         return {
@@ -98,7 +121,6 @@ def retrieve_parent_context(
     """
 
     try:
-        retrieval_service = get_retrieval_service()
         result = retrieval_service.retrieve(query=query, top_k=top_k)
         return result
 
@@ -119,7 +141,6 @@ def build_context(
     """
 
     try:
-        retrieval_service = get_retrieval_service()
         result = retrieval_service.build_context_text(query=query, top_k=top_k)
         return result
 
@@ -136,5 +157,4 @@ def vector_db_info():
     Show Qdrant vector database collection information.
     """
 
-    document_service = get_document_service()
     return document_service.vector_db_info()

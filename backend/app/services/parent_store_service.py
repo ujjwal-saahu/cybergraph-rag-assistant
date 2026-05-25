@@ -63,6 +63,40 @@ class ParentStoreService:
             metadata=data["metadata"],
         )
 
+    def delete_parent_chunks_by_document_id(self, document_id: str) -> int:
+        """
+        Delete parent chunks connected to one document_id.
+        """
+
+        deleted_count = 0
+
+        for file_path in self.parent_store_dir.glob("*.json"):
+            try:
+                data = json.loads(file_path.read_text(encoding="utf-8"))
+                metadata = data.get("metadata", {})
+
+                if metadata.get("document_id") == document_id:
+                    file_path.unlink()
+                    deleted_count += 1
+
+            except Exception:
+                continue
+
+        return deleted_count
+
+    def clear_all_parent_chunks(self) -> int:
+        """
+        Delete all stored parent chunks.
+        """
+
+        deleted_count = 0
+
+        for file_path in self.parent_store_dir.glob("*.json"):
+            file_path.unlink()
+            deleted_count += 1
+
+        return deleted_count
+
     def list_parent_chunks(self) -> list[dict]:
         """
         List stored parent chunks.

@@ -15,7 +15,7 @@ class DocumentService:
     """
     Service for handling document upload, saving,
     Markdown conversion, parent-child chunking,
-    and vector database storage.
+    vector database storage, deletion, and re-indexing.
     """
 
     def __init__(self):
@@ -117,8 +117,11 @@ class DocumentService:
         for markdown_file in self.markdown_dir.glob("*.md"):
             text = markdown_file.read_text(encoding="utf-8", errors="ignore")
 
+            document_id = markdown_file.stem.split("_")[0]
+
             documents.append(
                 {
+                    "document_id": document_id,
                     "filename": markdown_file.name,
                     "path": str(markdown_file),
                     "characters": len(text),
@@ -161,3 +164,83 @@ class DocumentService:
         """
 
         return self.vector_store.collection_info()
+
+    def delete_document(self, document_id: str) -> dict:
+        """
+        Delete document-related upload file, markdown file,
+        parent chunks, and then rebuild vector index.
+        """
+
+        deleted_upload_files = []
+        deleted_markdown_files = []
+
+        for file_path in self.upload_dir.glob(f"{document_id}_*"):
+            file_path.unlink()
+            deleted_upload_files.append(str(file_path))
+
+        for file_path in self.markdown_dir.glob(f"{document_id}_*.md"):
+            file_path.unlink()
+            deleted_markdown_files.append(str(file_path))
+
+        deleted_parent_chunks = self.parent_store.delete_parent_chunks_by_document_id(
+            document_id=document_id
+        )
+
+        reindex_result = self.reindex_all_documents()
+
+        return {
+            "status": "deleted_and_reindexed",
+            "document_id": document_id,
+            "deleted_upload_files": deleted_upload_files,
+            "deleted_markdown_files": deleted_markdown_files,
+            "deleted_parent_chunks": deleted_parent_chunks,
+            "reindex_result": reindex_result,
+        }
+
+    def reindex_all_documents(self) -> dict:
+        """
+        Rebuild parent store and Qdrant vector database
+        from all remaining Markdown files.
+        """
+
+        cleared_parent_chunks = self.parent_store.clear_all_parent_chunks()
+        vector_reset = self.vector_store.reset_vector_store()
+
+        total_documents = 0
+        total_parent_chunks = 0
+        total_child_chunks = 0
+        total_saved_parent_chunks = 0
+        total_saved_child_chunks = 0
+        failed_documents = []
+
+        for markdown_path in self.markdown_dir.glob("*.md"):
+            try:
+                chunk_result = self.process_chunks(markdown_path)
+
+                total_documents += 1
+                total_parent_chunks += chunk_result.get("parent_chunks", 0)
+                total_child_chunks += chunk_result.get("child_chunks", 0)
+                total_saved_parent_chunks += chunk_result.get("saved_parent_chunks", 0)
+                total_saved_child_chunks += chunk_result.get(
+                    "saved_child_chunks_to_qdrant", 0
+                )
+
+            except Exception as e:
+                failed_documents.append(
+                    {
+                        "file": str(markdown_path),
+                        "error": str(e),
+                    }
+                )
+
+        return {
+            "status": "reindexed",
+            "cleared_parent_chunks": cleared_parent_chunks,
+            "vector_reset": vector_reset,
+            "total_documents": total_documents,
+            "total_parent_chunks": total_parent_chunks,
+            "total_child_chunks": total_child_chunks,
+            "total_saved_parent_chunks": total_saved_parent_chunks,
+            "total_saved_child_chunks_to_qdrant": total_saved_child_chunks,
+            "failed_documents": failed_documents,
+        }

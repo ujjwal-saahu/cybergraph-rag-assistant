@@ -1,23 +1,30 @@
 from pathlib import Path
 from typing import List
+import shutil
 
 from langchain_core.documents import Document
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_qdrant import QdrantVectorStore
-
 from qdrant_client import QdrantClient
-from qdrant_client.models import Distance, VectorParams
 
 from app.config import settings
 
 
 class VectorStoreService:
     """
-    Qdrant vector database service.
+    Handles Qdrant vector database operations.
 
-    Stores child chunks in Qdrant and performs semantic search.
-    This version is stable for local Qdrant file storage on Windows.
+    Important:
+    Qdrant local mode locks the storage folder.
+    Therefore, this service uses shared class-level objects so that
+    only one QdrantClient is created per running Python process.
     """
+
+    _shared_embeddings = None
+    _shared_client = None
+    _shared_vector_store = None
+    _shared_qdrant_path = None
+    _shared_collection_name = None
 
     def __init__(self):
         self.qdrant_path = Path(settings.QDRANT_PATH)
@@ -25,66 +32,72 @@ class VectorStoreService:
 
         self.qdrant_path.mkdir(parents=True, exist_ok=True)
 
-        self.embeddings = HuggingFaceEmbeddings(
-            model_name=settings.EMBEDDING_MODEL
-        )
+        if VectorStoreService._shared_embeddings is None:
+            VectorStoreService._shared_embeddings = HuggingFaceEmbeddings(
+                model_name=settings.EMBEDDING_MODEL
+            )
 
-        self.client = QdrantClient(path=str(self.qdrant_path))
-        self.vector_store: QdrantVectorStore | None = None
+        if VectorStoreService._shared_client is None:
+            VectorStoreService._shared_client = QdrantClient(
+                path=str(self.qdrant_path)
+            )
 
-    def _collection_exists(self) -> bool:
+        VectorStoreService._shared_qdrant_path = self.qdrant_path
+        VectorStoreService._shared_collection_name = self.collection_name
+
+        self.embeddings = VectorStoreService._shared_embeddings
+        self.client = VectorStoreService._shared_client
+        self.vector_store = VectorStoreService._shared_vector_store
+
+    def _get_vector_store(self, documents: List[Document] | None = None):
+        """
+        Lazily initialize Qdrant vector store.
+        """
+
         try:
-            return self.client.collection_exists(
-                collection_name=self.collection_name
-            )
+            if VectorStoreService._shared_vector_store is None:
+                VectorStoreService._shared_vector_store = QdrantVectorStore(
+                    client=VectorStoreService._shared_client,
+                    collection_name=self.collection_name,
+                    embedding=VectorStoreService._shared_embeddings,
+                )
+
+            self.vector_store = VectorStoreService._shared_vector_store
+            return self.vector_store
+
         except Exception:
-            return False
+            if documents is None:
+                raise
 
-    def _create_collection_if_needed(self) -> None:
-        """
-        Create collection manually if not available.
-        """
-
-        if self._collection_exists():
-            return
-
-        test_vector = self.embeddings.embed_query("test")
-        vector_size = len(test_vector)
-
-        self.client.create_collection(
-            collection_name=self.collection_name,
-            vectors_config=VectorParams(
-                size=vector_size,
-                distance=Distance.COSINE,
-            ),
-        )
-
-    def _get_vector_store(self) -> QdrantVectorStore:
-        """
-        Create and return LangChain QdrantVectorStore.
-        """
-
-        self._create_collection_if_needed()
-
-        if self.vector_store is None:
-            self.vector_store = QdrantVectorStore(
-                client=self.client,
+            VectorStoreService._shared_vector_store = QdrantVectorStore.from_documents(
+                documents=documents,
+                embedding=VectorStoreService._shared_embeddings,
+                path=str(self.qdrant_path),
                 collection_name=self.collection_name,
-                embedding=self.embeddings,
             )
 
-        return self.vector_store
+            VectorStoreService._shared_client = VectorStoreService._shared_vector_store.client
+
+            self.client = VectorStoreService._shared_client
+            self.vector_store = VectorStoreService._shared_vector_store
+
+            return self.vector_store
 
     def add_child_chunks(self, child_chunks: List[Document]) -> int:
         """
-        Add child chunks to Qdrant.
+        Add child chunks to Qdrant vector database.
         """
 
         if not child_chunks:
             return 0
 
-        vector_store = self._get_vector_store()
-        vector_store.add_documents(documents=child_chunks)
+        try:
+            vector_store = self._get_vector_store()
+            vector_store.add_documents(child_chunks)
+
+        except Exception:
+            vector_store = self._get_vector_store(documents=child_chunks)
+            self.vector_store = vector_store
 
         return len(child_chunks)
 
@@ -97,44 +110,74 @@ class VectorStoreService:
 
         vector_store = self._get_vector_store()
 
-        return vector_store.similarity_search(
+        results = vector_store.similarity_search(
             query=query,
             k=k,
         )
 
-    def collection_info(self) -> dict:
+        return results
+
+    def reset_vector_store(self) -> dict:
         """
-        Return Qdrant collection info safely across qdrant-client versions.
+        Delete local Qdrant storage and recreate empty folder.
+
+        This is used for full re-indexing.
         """
 
         try:
-            if not self._collection_exists():
-                return {
-                    "collection_name": self.collection_name,
-                    "status": "not_initialized",
-                    "points_count": 0,
-                    "indexed_vectors_count": 0,
-                }
+            try:
+                if VectorStoreService._shared_client is not None:
+                    VectorStoreService._shared_client.close()
+            except Exception:
+                pass
 
-            info = self.client.get_collection(
-                collection_name=self.collection_name
+            VectorStoreService._shared_client = None
+            VectorStoreService._shared_vector_store = None
+
+            if self.qdrant_path.exists():
+                shutil.rmtree(self.qdrant_path)
+
+            self.qdrant_path.mkdir(parents=True, exist_ok=True)
+
+            VectorStoreService._shared_client = QdrantClient(
+                path=str(self.qdrant_path)
             )
 
-            points_count = getattr(info, "points_count", 0)
-            indexed_vectors_count = getattr(info, "indexed_vectors_count", 0)
+            self.client = VectorStoreService._shared_client
+            self.vector_store = None
+
+            return {
+                "status": "reset",
+                "collection_name": self.collection_name,
+                "qdrant_path": str(self.qdrant_path),
+            }
+
+        except Exception as e:
+            return {
+                "status": "failed",
+                "error": str(e),
+            }
+
+    def collection_info(self) -> dict:
+        """
+        Return basic information about Qdrant collection.
+        """
+
+        try:
+            info = VectorStoreService._shared_client.get_collection(
+                self.collection_name
+            )
 
             return {
                 "collection_name": self.collection_name,
                 "status": str(info.status),
-                "points_count": points_count,
-                "indexed_vectors_count": indexed_vectors_count,
+                "points_count": info.points_count,
+                "vectors_count": info.vectors_count,
             }
 
         except Exception as e:
             return {
                 "collection_name": self.collection_name,
-                "status": "error",
-                "points_count": 0,
-                "indexed_vectors_count": 0,
+                "status": "not_initialized",
                 "error": str(e),
             }

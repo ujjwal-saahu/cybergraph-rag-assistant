@@ -219,17 +219,86 @@ with tab_documents:
                 if not documents:
                     st.info("No processed documents found.")
                 else:
+                    st.write(f"Total processed documents: {len(documents)}")
+
                     for doc in documents:
-                        with st.expander(doc.get("filename", "Unknown document")):
+                        document_id = doc.get("document_id", "")
+                        filename = doc.get("filename", "Unknown document")
+
+                        with st.expander(f"{filename} | Document ID: {document_id}"):
+                            st.write(f"Document ID: `{document_id}`")
                             st.write(f"Path: `{doc.get('path')}`")
                             st.write(f"Characters: {doc.get('characters')}")
                             st.write(doc.get("preview", ""))
 
             else:
                 st.error("Could not fetch documents")
+                st.write(response.text)
 
         except Exception as e:
             st.error(f"Error: {e}")
+
+    st.divider()
+
+    st.subheader("Delete Document")
+
+    st.warning(
+        "Deleting a document will remove its uploaded file, Markdown file, parent chunks, "
+        "and rebuild the vector index from remaining documents."
+    )
+
+    delete_document_id = st.text_input(
+        "Enter document_id to delete",
+        placeholder="Copy document_id from the processed documents list above",
+    )
+
+    if st.button("Delete Document and Re-index"):
+        if not delete_document_id.strip():
+            st.warning("Please enter a document_id.")
+        else:
+            with st.spinner("Deleting document and rebuilding index..."):
+                try:
+                    response = requests.delete(
+                        f"{BACKEND_URL}/documents/{delete_document_id.strip()}",
+                        timeout=600,
+                    )
+
+                    if response.status_code == 200:
+                        st.success("Document deleted and index rebuilt.")
+                        st.json(response.json())
+                    else:
+                        st.error("Delete failed.")
+                        st.write(response.text)
+
+                except Exception as e:
+                    st.error(f"Delete error: {e}")
+
+    st.divider()
+
+    st.subheader("Re-index All Documents")
+
+    st.info(
+        "Use this if the vector database becomes inconsistent or if you want to rebuild "
+        "the full index from all remaining Markdown files."
+    )
+
+    if st.button("Re-index All Remaining Documents"):
+        with st.spinner("Rebuilding parent chunks and vector index..."):
+            try:
+                response = requests.post(
+                    f"{BACKEND_URL}/documents/reindex",
+                    timeout=600,
+                )
+
+                if response.status_code == 200:
+                    st.success("Re-indexing completed.")
+                    st.json(response.json())
+                else:
+                    st.error("Re-indexing failed.")
+                    st.write(response.text)
+
+            except Exception as e:
+                st.error(f"Re-index error: {e}")
 
     st.divider()
 
@@ -237,7 +306,10 @@ with tab_documents:
 
     if st.button("Refresh Parent Chunks"):
         try:
-            response = requests.get(f"{BACKEND_URL}/documents/parent-chunks", timeout=60)
+            response = requests.get(
+                f"{BACKEND_URL}/documents/parent-chunks",
+                timeout=60,
+            )
 
             if response.status_code == 200:
                 result = response.json()
@@ -249,15 +321,21 @@ with tab_documents:
                     st.write(f"Total parent chunks: {len(parent_chunks)}")
 
                     for chunk in parent_chunks[:20]:
+                        source = chunk.get("source", "Unknown source")
+                        parent_id = chunk.get("parent_id", "Unknown parent ID")
+                        document_id = chunk.get("document_id", "Unknown document ID")
+
                         with st.expander(
-                            f"{chunk.get('source')} | Parent ID: {chunk.get('parent_id')}"
+                            f"{source} | Document ID: {document_id} | Parent ID: {parent_id}"
                         ):
-                            st.write(f"Document ID: `{chunk.get('document_id')}`")
+                            st.write(f"Document ID: `{document_id}`")
+                            st.write(f"Parent ID: `{parent_id}`")
                             st.write(f"Characters: {chunk.get('characters')}")
                             st.write(chunk.get("preview", ""))
 
             else:
                 st.error("Could not fetch parent chunks")
+                st.write(response.text)
 
         except Exception as e:
             st.error(f"Error: {e}")
