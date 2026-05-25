@@ -1,6 +1,5 @@
+from pydantic_settings import BaseSettings
 from pathlib import Path
-
-from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -9,7 +8,7 @@ class Settings(BaseSettings):
 
     LLM_PROVIDER: str = "ollama"
     LLM_MODEL: str = "qwen2.5:3b-instruct"
-    OLLAMA_BASE_URL: str = "http://127.0.0.1:18080"
+    OLLAMA_BASE_URL: str = "http://127.0.0.1:11434"
     LLM_TEMPERATURE: float = 0.1
 
     EMBEDDING_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
@@ -27,10 +26,8 @@ class Settings(BaseSettings):
     PARENT_CHUNK_OVERLAP: int = 250
     TOP_K: int = 5
 
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        extra="ignore"
-    )
+    class Config:
+        env_file = ".env"
 
 
 settings = Settings()

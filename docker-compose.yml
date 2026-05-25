@@ -1,0 +1,45 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cybergraph_backend
+    ports:
+      - "8000:8000"
+    environment:
+      APP_NAME: CyberGraph RAG
+      APP_VERSION: 1.0.0
+
+      LLM_PROVIDER: ollama
+      LLM_MODEL: qwen2.5:3b-instruct
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+      LLM_TEMPERATURE: 0.1
+
+      EMBEDDING_MODEL: sentence-transformers/all-MiniLM-L6-v2
+
+      QDRANT_PATH: ./app/data/vector_db
+      COLLECTION_NAME: cybergraph_docs
+
+      UPLOAD_DIR: ./app/data/uploads
+      MARKDOWN_DIR: ./app/data/markdown
+      PARENT_STORE_DIR: ./app/data/parent_store
+
+      CHILD_CHUNK_SIZE: 700
+      CHILD_CHUNK_OVERLAP: 120
+      PARENT_CHUNK_SIZE: 2200
+      PARENT_CHUNK_OVERLAP: 250
+      TOP_K: 5
+    volumes:
+      - ./backend/app/data:/app/app/data
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: cybergraph_frontend
+    ports:
+      - "8501:8501"
+    environment:
+      BACKEND_URL: http://backend:8000
+    depends_on:
+      - backend

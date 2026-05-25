@@ -11,9 +11,10 @@ class LLMService:
 
     def __init__(self):
         self.llm = ChatOllama(
-            model=settings.LLM_MODEL,
-            temperature=settings.LLM_TEMPERATURE,
-        )
+    model=settings.LLM_MODEL,
+    temperature=settings.LLM_TEMPERATURE,
+    base_url=settings.OLLAMA_BASE_URL,
+)
 
     def generate_grounded_answer(
         self,

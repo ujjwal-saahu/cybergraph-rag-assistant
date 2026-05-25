@@ -14,9 +14,10 @@ class QueryRewriterService:
 
     def __init__(self):
         self.llm = ChatOllama(
-            model=settings.LLM_MODEL,
-            temperature=0.0,
-        )
+    model=settings.LLM_MODEL,
+    temperature=0.0,
+    base_url=settings.OLLAMA_BASE_URL,
+)
 
     def rewrite(self, question: str) -> str:
         """
