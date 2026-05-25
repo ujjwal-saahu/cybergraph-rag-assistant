@@ -232,6 +232,32 @@ This project demonstrates practical AI engineering skills:
 - Add role-based document access
 - Add exportable chat history
 
+## Agentic Workflow Visualization
+
+```mermaid
+flowchart TD
+    A[User Question]
+    B[Query Rewriting Agent]
+    C[Qdrant Child Chunk Search]
+    D[Parent Context Retrieval]
+    E[Relevance Grading Agent]
+    F[Grounded Answer Generation]
+    G[Hallucination Checker Agent]
+    H[Optional Safer Regeneration]
+    I[Final Answer with Sources]
+
+    A --> B
+    B --> C
+    C --> D
+    D --> E
+    E --> F
+    F --> G
+    G -->|Grounded| I
+    G -->|Unsupported Claims| H
+    H --> I
+```
+
+
 <div align="center">
 ⭐ If you find this project useful, consider starring the repository.
 
