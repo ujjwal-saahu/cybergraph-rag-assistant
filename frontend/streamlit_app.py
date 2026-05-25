@@ -47,8 +47,8 @@ with st.sidebar:
             st.error(f"Error: {e}")
 
 
-tab_upload, tab_chat, tab_documents = st.tabs(
-    ["📄 Upload Documents", "💬 Ask Questions", "📚 Documents"]
+tab_upload, tab_chat, tab_documents, tab_workflow = st.tabs(
+    ["📄 Upload Documents", "💬 Ask Questions", "📚 Documents", "🧠 Workflow"]
 )
 
 
@@ -261,3 +261,73 @@ with tab_documents:
 
         except Exception as e:
             st.error(f"Error: {e}")
+
+
+with tab_workflow:
+    st.subheader("CyberGraph RAG Agentic Workflow")
+
+    st.caption(
+        "This workflow shows how the system rewrites queries, retrieves parent-child context, "
+        "grades relevance, checks hallucination, and returns a grounded answer."
+    )
+
+    if st.button("Load Workflow Diagram"):
+        try:
+            response = requests.get(f"{BACKEND_URL}/workflow/graphviz", timeout=30)
+
+            if response.status_code == 200:
+                result = response.json()
+                diagram = result.get("diagram", "")
+
+                st.graphviz_chart(diagram)
+
+            else:
+                st.error("Could not load workflow diagram.")
+
+        except Exception as e:
+            st.error(f"Workflow loading error: {e}")
+
+    st.divider()
+
+    if st.button("Load Workflow Steps"):
+        try:
+            response = requests.get(f"{BACKEND_URL}/workflow/steps", timeout=30)
+
+            if response.status_code == 200:
+                result = response.json()
+
+                steps = result.get("steps", [])
+                edges = result.get("edges", [])
+
+                st.markdown("### Workflow Steps")
+
+                for index, step in enumerate(steps, start=1):
+                    with st.expander(f"{index}. {step.get('name')}"):
+                        st.write(step.get("description"))
+
+                st.markdown("### Workflow Edges")
+                st.json(edges)
+
+            else:
+                st.error("Could not load workflow steps.")
+
+        except Exception as e:
+            st.error(f"Workflow steps loading error: {e}")
+
+    st.divider()
+
+    if st.button("Load Mermaid Diagram for README"):
+        try:
+            response = requests.get(f"{BACKEND_URL}/workflow/mermaid", timeout=30)
+
+            if response.status_code == 200:
+                result = response.json()
+                mermaid = result.get("diagram", "")
+
+                st.code(mermaid, language="markdown")
+
+            else:
+                st.error("Could not load Mermaid diagram.")
+
+        except Exception as e:
+            st.error(f"Mermaid loading error: {e}")          
