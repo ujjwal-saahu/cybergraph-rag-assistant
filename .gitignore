@@ -8,3 +8,23 @@ __pycache__/
 .env
 .venv/
 venv/
+# Runtime data
+backend/app/data/uploads/*
+backend/app/data/markdown/*
+backend/app/data/vector_db/*
+backend/app/data/parent_store/*
+
+# Keep folders
+!backend/app/data/uploads/.gitkeep
+!backend/app/data/markdown/.gitkeep
+!backend/app/data/vector_db/.gitkeep
+!backend/app/data/parent_store/.gitkeep
+
+# Python
+__pycache__/
+*.pyc
+.env
+
+# Docker / system
+.dockerignore
+.DS_Store

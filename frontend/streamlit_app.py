@@ -53,12 +53,12 @@ tab_upload, tab_chat, tab_documents, tab_workflow = st.tabs(
 
 
 with tab_upload:
-    st.subheader("Upload PDF / TXT / Markdown")
+    st.subheader("Upload PDF / TXT / Markdown / DOCX / CSV")
 
     uploaded_file = st.file_uploader(
-        "Choose a document",
-        type=["pdf", "txt", "md", "markdown"],
-    )
+    "Choose a document",
+    type=["pdf", "txt", "md", "markdown", "docx", "csv"],
+)
 
     if uploaded_file is not None:
         st.info(f"Selected file: {uploaded_file.name}")

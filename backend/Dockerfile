@@ -13,6 +13,11 @@ RUN apt-get update && apt-get install -y \
 COPY requirements-docker.txt .
 
 RUN pip install --upgrade pip
+
+# Install CPU-only PyTorch first to avoid huge CUDA packages
+RUN pip install --index-url https://download.pytorch.org/whl/cpu torch==2.5.1+cpu
+
+# Install the rest of the backend dependencies
 RUN pip install -r requirements-docker.txt
 
 COPY app ./app

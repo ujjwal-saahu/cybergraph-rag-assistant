@@ -19,4 +19,7 @@ sentence-transformers
 pymupdf
 pymupdf4llm
 
+python-docx
+pandas
+tabulate
 requests
