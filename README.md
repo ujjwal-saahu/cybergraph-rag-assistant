@@ -4,8 +4,9 @@
 
 ### Agentic Cybersecurity Knowledge Assistant
 
-**CyberGraph RAG** is an Agentic Retrieval-Augmented Generation system designed for cybersecurity, cloud, AI, and technical documents.  
-It combines document ingestion, parent-child chunking, vector search, local LLM inference, query rewriting, relevance grading, hallucination checking, and source-grounded answer generation.
+**CyberGraph RAG** is a full-stack Agentic Retrieval-Augmented Generation system designed for cybersecurity, cloud, AI, research, resume, and technical documents.
+
+It combines document ingestion, DOCX/CSV/PDF parsing, parent-child chunking, vector search, local LLM inference, query rewriting, relevance grading, hallucination checking, document deletion, re-indexing, Docker support, and source-grounded answer generation.
 
 <br/>
 
@@ -15,6 +16,7 @@ It combines document ingestion, parent-child chunking, vector search, local LLM 
 ![Qdrant](https://img.shields.io/badge/Qdrant-Vector_DB-DC244C?style=for-the-badge)
 ![Ollama](https://img.shields.io/badge/Ollama-Local_LLM-black?style=for-the-badge)
 ![LangChain](https://img.shields.io/badge/LangChain-RAG-green?style=for-the-badge)
+![Docker](https://img.shields.io/badge/Docker-Supported-2496ED?style=for-the-badge&logo=docker)
 
 </div>
 
@@ -22,24 +24,29 @@ It combines document ingestion, parent-child chunking, vector search, local LLM 
 
 ## 🚀 Overview
 
-CyberGraph RAG is a full-stack **Agentic RAG assistant** that allows users to upload documents and ask grounded questions from those documents.
+CyberGraph RAG is an **Agentic RAG assistant** that allows users to upload documents and ask grounded questions from those documents.
 
-Unlike a normal RAG chatbot, this system does not simply retrieve chunks and generate an answer.  
-It performs multiple agentic reasoning steps before producing the final response.
+Unlike a basic RAG chatbot, this system does not simply retrieve chunks and generate an answer. It performs multiple reasoning and verification steps before producing the final response.
 
 The system can:
 
-- Upload and process PDF, TXT, and Markdown documents
-- Convert PDFs into clean Markdown text
+- Upload and process PDF, TXT, Markdown, DOCX, and CSV files
+- Convert PDFs into clean Markdown using `pymupdf4llm`
+- Extract DOCX paragraphs and tables
+- Convert CSV files into Markdown-style tabular context
 - Split documents using parent-child chunking
 - Store child chunks in Qdrant vector database
-- Retrieve larger parent contexts for better answer quality
+- Store parent chunks locally for richer answer context
+- Retrieve larger parent contexts from small semantic matches
 - Rewrite user questions into better search queries
 - Grade retrieved context relevance
-- Generate grounded answers using a local Ollama LLM
+- Generate answers using a local Ollama LLM
 - Check whether answers are supported by retrieved context
-- Regenerate safer answers if unsupported claims are detected
-- Display sources, relevance grades, and hallucination checks in a Streamlit UI
+- Regenerate safer answers when unsupported claims are detected
+- Delete documents and rebuild the vector index
+- Re-index all remaining documents
+- Run locally or with Docker Compose
+- Display sources, relevance grades, and hallucination checks in Streamlit
 
 ---
 
@@ -67,6 +74,12 @@ The system can:
 
 ---
 
+## 🧠 Why This Project Matters
+
+Most basic RAG systems follow this simple pipeline:
+
+```text
+User Question → Vector Search → LLM Answer
 ## 🧠 Why This Project Matters
 
 Most basic RAG systems follow this simple pipeline:
