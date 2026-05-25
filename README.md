@@ -47,17 +47,23 @@ The system can:
 
 | Feature | Description |
 |---|---|
-| 📄 Document Upload | Supports PDF, TXT, Markdown, and `.md` files |
+| 📄 Multi-format Upload | Supports PDF, TXT, Markdown, DOCX, and CSV files |
 | 🧹 Text Cleaning | Removes noisy spaces, blank lines, and formatting issues |
-| 🧩 Parent-Child Chunking | Uses small chunks for search and larger chunks for answer context |
-| 🧠 Local LLM | Uses Ollama for local/offline answer generation |
+| 📘 DOCX Parsing | Extracts paragraphs and tables from Word documents |
+| 📊 CSV Parsing | Converts CSV rows and columns into Markdown table context |
+| 🧩 Parent-Child Chunking | Uses small child chunks for search and large parent chunks for answer context |
 | 🔎 Vector Search | Uses Qdrant with HuggingFace sentence-transformer embeddings |
+| 🧠 Local LLM | Uses Ollama for local/offline answer generation |
 | 🔁 Query Rewriting | Rewrites vague user questions into better retrieval queries |
-| ✅ Relevance Grading | Filters out weak or unrelated retrieved contexts |
+| ✅ Relevance Grading | Filters or grades retrieved context before answer generation |
 | 🛡️ Hallucination Checking | Checks if the answer is supported by retrieved documents |
-| ♻️ Safer Regeneration | Regenerates answer when unsupported claims are detected |
+| ♻️ Safer Regeneration | Regenerates answers when unsupported claims are detected |
+| 🗑️ Document Deletion | Deletes uploaded file, Markdown file, and parent chunks |
+| 🔄 Re-indexing | Rebuilds Qdrant vector DB from remaining Markdown documents |
+| 🐳 Docker Support | Runs backend and frontend using Docker Compose |
 | 🌐 FastAPI Backend | Provides clean REST API and Swagger documentation |
-| 🎨 Streamlit Frontend | Provides an interactive UI for upload and chat |
+| 🎨 Streamlit Frontend | Provides an interactive UI for upload, chat, deletion, and re-indexing |
+| 📈 LangGraph Workflow View | Visualizes the agentic RAG workflow |
 
 ---
 
@@ -94,12 +100,19 @@ Final Answer with Sources
 CyberGraph RAG
 │
 ├── Document Ingestion
-│   ├── PDF/TXT/Markdown Upload
+│   ├── PDF Upload
+│   ├── TXT / Markdown Upload
+│   ├── DOCX Upload
+│   ├── CSV Upload
 │   ├── PDF to Markdown Conversion
+│   ├── DOCX Paragraph and Table Extraction
+│   ├── CSV to Markdown Conversion
 │   ├── Text Cleaning
 │   └── Parent-Child Chunking
 │
 ├── Storage Layer
+│   ├── Uploaded Files
+│   ├── Markdown Files
 │   ├── Parent Chunks Stored Locally
 │   └── Child Chunks Stored in Qdrant
 │
@@ -115,6 +128,11 @@ CyberGraph RAG
 │   ├── Hallucination Checking
 │   └── Safer Answer Regeneration
 │
+├── Document Management
+│   ├── List Documents
+│   ├── Delete Documents
+│   └── Re-index Remaining Documents
+│
 ├── Backend
 │   └── FastAPI REST API
 │
@@ -122,20 +140,26 @@ CyberGraph RAG
     └── Streamlit Web Interface
 ```
 
- ## 🛠️ Tech Stack
+ ## 🧰 Tech Stack
 
- | Layer            | Technology                        |
+| Layer            | Technology                        |
 | ---------------- | --------------------------------- |
 | Language         | Python                            |
 | Backend          | FastAPI                           |
 | Frontend         | Streamlit                         |
 | Local LLM        | Ollama                            |
+| LLM Model        | Qwen2.5 3B Instruct via Ollama    |
 | Embeddings       | HuggingFace Sentence Transformers |
-| Vector Database  | Qdrant                            |
+| Vector Database  | Qdrant Local                      |
 | RAG Framework    | LangChain                         |
-| Document Parsing | PyMuPDF / pymupdf4llm             |
+| Agent Workflow   | LangGraph-style agentic workflow  |
+| PDF Parsing      | PyMuPDF / pymupdf4llm             |
+| DOCX Parsing     | python-docx                       |
+| CSV Parsing      | pandas                            |
 | API Docs         | Swagger UI                        |
-| Environment      | Conda / venv                      |
+| Containerization | Docker and Docker Compose         |
+| Environment      | Conda / venv / Docker             |
+
 
 
 ```markdown
@@ -177,19 +201,63 @@ cybergraph-rag-assistant/
 │   │   ├── config.py
 │   │   └── main.py
 │   │
-│   └── requirements.txt
+│   ├── Dockerfile
+│   ├── requirements.txt
+│   └── requirements-docker.txt
 │
 ├── frontend/
-│   └── streamlit_app.py
+│   ├── streamlit_app.py
+│   ├── Dockerfile
+│   └── requirements-docker.txt
 │
 ├── assets/
 │   └── screenshots/
 │
+├── docker-compose.yml
 ├── .env.example
 ├── .gitignore
 └── README.md
 
 ```
+##📄 Supported File Types
+
+| File Type | Support                                                  |
+| --------- | -------------------------------------------------------- |
+| PDF       | Extracted and converted to Markdown using `pymupdf4llm`  |
+| TXT       | Loaded as plain text                                     |
+| Markdown  | Loaded as plain text                                     |
+| DOCX      | Paragraphs and tables converted into Markdown-style text |
+| CSV       | First 200 rows converted into Markdown table context     |
+
+
+##🔌 API Endpoints
+
+Health
+
+| Method | Endpoint  | Description          |
+| ------ | --------- | -------------------- |
+| GET    | `/health` | Check backend health |
+
+Documents
+
+| Method | Endpoint                    | Description                         |
+| ------ | --------------------------- | ----------------------------------- |
+| POST   | `/documents/upload`         | Upload and index a document         |
+| GET    | `/documents/`               | List processed documents            |
+| GET    | `/documents/parent-chunks`  | List stored parent chunks           |
+| GET    | `/documents/search`         | Search child chunks                 |
+| GET    | `/documents/retrieve`       | Retrieve parent contexts            |
+| GET    | `/documents/context`        | Build final context text            |
+| GET    | `/documents/vector-db/info` | Show Qdrant collection info         |
+| DELETE | `/documents/{document_id}`  | Delete a document and rebuild index |
+| POST   | `/documents/reindex`        | Rebuild full vector index           |
+
+Chat
+
+| Method | Endpoint | Description                      |
+| ------ | -------- | -------------------------------- |
+| POST   | `/chat/` | Ask a question using Agentic RAG |
+
 
 ## 🎯 Use Cases
 
@@ -202,6 +270,10 @@ CyberGraph RAG can be adapted for:
 - Technical knowledge base search
 - Security policy and compliance document review
 - Internal enterprise documentation assistant
+- SOC knowledge assistant
+- Threat intelligence document assistant
+- Academic paper summarization and Q&A
+- Local private document chatbot
 
 ## 🧑‍💻 What I Built
 
@@ -220,17 +292,33 @@ This project demonstrates practical AI engineering skills:
 - Source-grounded answer generation
 
 ## 🔮 Future Improvements
-- Add LangGraph workflow visualization
-- Add Docker and Docker Compose support
-- Add user authentication
-- Add document deletion and re-indexing
-- Add conversation memory
-- Add hybrid dense + sparse retrieval
-- Add DOCX and CSV support
-- Add RAG evaluation metrics
-- Add cloud deployment
-- Add role-based document access
-- Add exportable chat history
+The following features are planned for future improvement:
+
+- User authentication
+- Role-based document access
+- Conversation memory
+- Exportable chat history
+- Hybrid dense + sparse retrieval
+- RAG evaluation metrics
+- Cloud deployment
+- Better frontend design and UI polishing
+- Admin dashboard for document management
+- Multiple collection support
+- Multi-user document separation
+- Background document processing
+- Upload progress tracking
+- Better error handling in Streamlit
+- Large file handling improvement
+- API rate limiting
+- Unit tests and integration tests
+- CI/CD pipeline for GitHub
+- Deployment guide for cloud platforms
+- Support for additional file types such as XLSX and HTML
+- Metadata-based filtering
+- Source citation display in final answers
+- Chat session management
+- Persistent conversation database
+- Production Qdrant server support instead of local Qdrant path mode
 
 ## Agentic Workflow Visualization
 
@@ -256,6 +344,28 @@ flowchart TD
     G -->|Unsupported Claims| H
     H --> I
 ```
+
+##📌 Current Completed Features
+
+✅ Agentic RAG backend
+✅ FastAPI REST API
+✅ Streamlit frontend
+✅ Local Ollama LLM integration
+✅ Qdrant vector database
+✅ Parent-child chunking
+✅ Query rewriting
+✅ Relevance grading
+✅ Hallucination checking
+✅ Safer answer regeneration
+✅ LangGraph-style workflow visualization
+✅ Docker and Docker Compose support
+✅ Document deletion
+✅ Full document re-indexing
+✅ PDF support
+✅ TXT support
+✅ Markdown support
+✅ DOCX support
+✅ CSV support
 
 
 <div align="center">
