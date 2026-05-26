@@ -357,7 +357,7 @@ flowchart TD
     G -->|Unsupported Claims| H
     H --> I
 ```
-
+```
 ##📌 Current Completed Features
 
 ✅ Agentic RAG backend
@@ -379,7 +379,7 @@ flowchart TD
 ✅ Markdown support
 ✅ DOCX support
 ✅ CSV support
-
+```
 
 <div align="center">
 ⭐ If you find this project useful, consider starring the repository.
